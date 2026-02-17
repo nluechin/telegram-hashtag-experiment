@@ -61,4 +61,10 @@ This tool is designed for behavioral research and IRB-compliant data collection.
 
 ---
 
+Version 20+ of python-telegram-bot is built on asyncio, which is Python’s system for:
 
+handling many tasks at once
+
+without using threads
+
+very efficient for network-heavy apps (like bots)
