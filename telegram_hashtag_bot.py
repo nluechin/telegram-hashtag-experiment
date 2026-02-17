@@ -6,20 +6,19 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import Update     #telegram library objects: Update is object representing an incoming event (message, command, etc.)
+# telegram.ext provides the bot "framework" (app + handlers + filters)
 from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters,
+    Application,                # the main bot application (dispatcher + HTTP client)
+    CommandHandler,             # routes /start, /restart, /withdraw
+    MessageHandler,             # routes non-command text messages
+    ContextTypes,               # type hints for callback context
+    filters,                    # prebuilt filters for matching messages
 )
 
-# -----------------------------
-# Config
-# -----------------------------
+
 ENV_PATH = ".env"
-CSV_PATH = "Hashtag_Telegram_Study.csv"
+CSV_PATH = "Hashtag_telegram_study.csv"
 
 INTRO_TEXT = "Starting the game now."
 DONE_TEXT = "All done. Thank you!"
@@ -35,15 +34,20 @@ PROMPTS = [
     "Please submit another short hashtag response.",
 ]
 
-# Participant code format (adjust as you like)
-# Examples accepted: P014, p014, 014 (if you want)
+# Participant code format
+# Examples accepted: P014, p014, 014 
+# - accepts "P014", "p014", or "014"
+# - 2 to 4 digits (so 01..9999), optional leading P
 PID_PATTERN = re.compile(r"^P?\d{2,4}$", re.IGNORECASE)
 
+# Hashtag content pattern:
+# - after stripping leading '#', must be letters/numbers only
+# - no underscores, hyphens, emojis, punctuation, etc.
 HASHTAG_PATTERN = re.compile(r"^[A-Za-z0-9]+$")
 
-# -----------------------------
+
 # State (in-memory)
-# -----------------------------
+
 @dataclass
 class UserState:
     participant_id: Optional[str] = None
@@ -54,9 +58,9 @@ class UserState:
 # Keyed by Telegram chat_id for routing only (NOT written to CSV)
 user_state: Dict[int, UserState] = {}
 
-# -----------------------------
+
 # Helpers
-# -----------------------------
+
 def ensure_csv_header(path: str) -> None:
     if os.path.exists(path):
         return
