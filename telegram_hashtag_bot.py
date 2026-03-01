@@ -4,6 +4,8 @@ import time
 import re
 from dataclasses import dataclass
 from typing import Dict, Optional
+from hf_layer import HFPipeline
+from pipeline import run_step
 
 from dotenv import load_dotenv
 from telegram import Update     #telegram library objects: Update is object representing an incoming event (message, command, etc.)
@@ -16,7 +18,29 @@ from telegram.ext import (
     filters,                    # prebuilt filters for matching messages
 )
 
+#This file handles all interaction with Telegram users.
+#
+# Responsibilities:
+# - receives incoming messages from participants
+# - manages per-user state (participant_id, round, etc.)
+# - sends prompts and instructions to users
+# - routes user responses into the experiment pipeline
+#
+# This file DOES NOT contain:
+# - model logic (handled in hf_layer.py)
+# - experiment step logic (handled in pipeline.py)
+# - data schemas (handled in schemas.py)
+#
+# Role in the system:
+# This is the user interface layer that connects human
+# participants to the backend experiment system.
+#
 
+
+
+
+
+hf = HFPipeline(model_name="distilgpt2")
 ENV_PATH = ".env"
 CSV_PATH = "Hashtag_telegram_study.csv"
 
@@ -246,6 +270,16 @@ async def message_handler(update, context):
     # Step 2: Collect hashtag responses
     if state.awaiting_hashtag:
         cleaned = parse_hashtag(text)
+
+        # NEW: run structured pipeline step (human + AI objects)
+        human_obj, ai_obj = run_step(
+            hf=hf,
+            participant_id=state.participant_id,
+            round_idx=state.round_idx,
+            raw_text=text,
+            cleaned_text=cleaned,
+            prompt_text=PROMPTS[state.round_idx],
+        )
 
         # reject invalid hashtag format
         if cleaned is None:
