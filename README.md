@@ -69,6 +69,21 @@ Participants open the bot and:
 
 ---
 
+## Project Evolution
+
+This project originally used a lightweight LLM-based response generator (`TinyLlama`) to produce one related word in response to participant hashtags. That version served as an early prototype for testing interactive human–AI flow inside Telegram.
+
+As the project evolved, the response-generation approach shifted toward a more controlled semantic pipeline based on embeddings, cosine similarity, and structured machine learning logic. This change was made to improve:
+
+- consistency of responses
+- interpretability of outputs
+- reproducibility of experimental behavior
+- alignment with downstream analysis methods
+
+The earlier LLM-based implementation is retained in the repository as a baseline/reference point, but it is no longer the primary experimental direction.
+
+---
+
 ## Research Use
 
 This tool is designed for behavioral and computational social science research, including studies of human–AI interaction, language, and meaning formation.
