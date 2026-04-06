@@ -1,6 +1,18 @@
 from transformers import pipeline
 import re
 
+"""
+Legacy baseline: LLM-based response generator
+
+This module uses a Hugging Face text-generation pipeline to produce
+a one-word related response to participant input.
+
+It reflects an earlier version of the project before the system
+shifted toward a more controlled embedding-based / ML-driven approach.
+
+Retained for reference and comparison only.
+"""
+
 class HFPipeline:
     def __init__(self, model_name: str = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
         self.model_name = model_name

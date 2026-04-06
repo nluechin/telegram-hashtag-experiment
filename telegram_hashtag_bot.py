@@ -4,7 +4,7 @@ import time
 import re
 from dataclasses import dataclass
 from typing import Dict, Optional
-from hf_layer import HFPipeline
+from hf_pipeline_llm_baseline import HFPipeline
 from pipeline import run_step
 import asyncio
 
