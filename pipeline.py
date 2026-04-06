@@ -1,16 +1,6 @@
 import time
 from schemas import HumanResponse, AIResponse
 
-''' This is the experiment design logic:
-
--  how rounds work
-
-- how human + AI interact
-
-- what gets logged
-
-- what the prompt is
-'''
 def run_step(hf, participant_id, round_idx, raw_text, cleaned_text, prompt_text):
     human = HumanResponse(
         participant_id=participant_id,
@@ -22,7 +12,7 @@ def run_step(hf, participant_id, round_idx, raw_text, cleaned_text, prompt_text)
     )
 
     model_prompt = hf.build_prompt(prompt_text, cleaned_text)
-    ai_text = hf.generate(model_prompt, max_new_tokens=25)
+    ai_text = hf.generate(model_prompt, max_new_tokens=6)
 
     ai = AIResponse(
         model_name=hf.model_name,

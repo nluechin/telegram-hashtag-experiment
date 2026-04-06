@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 from hf_layer import HFPipeline
 from pipeline import run_step
+import asyncio
 
 from dotenv import load_dotenv
 from telegram import Update     #telegram library objects: Update is object representing an incoming event (message, command, etc.)
@@ -40,7 +41,7 @@ from telegram.ext import (
 
 
 
-hf = HFPipeline(model_name="distilgpt2")
+hf = HFPipeline(model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0")
 ENV_PATH = ".env"
 CSV_PATH = "Hashtag_telegram_study.csv"
 
@@ -271,21 +272,22 @@ async def message_handler(update, context):
     if state.awaiting_hashtag:
         cleaned = parse_hashtag(text)
 
-        # NEW: run structured pipeline step (human + AI objects)
-        human_obj, ai_obj = run_step(
-            hf=hf,
-            participant_id=state.participant_id,
-            round_idx=state.round_idx,
-            raw_text=text,
-            cleaned_text=cleaned,
-            prompt_text=PROMPTS[state.round_idx],
-        )
-
-        # reject invalid hashtag format
+        # reject invalid hashtag format first
         if cleaned is None:
             await update.message.reply_text(INVALID_HASHTAG_TEXT)
             return
 
+        # only run pipeline after valid input
+        human_obj, ai_obj = await asyncio.to_thread(
+            run_step,
+            hf,
+            state.participant_id,
+            state.round_idx,
+            text,
+            cleaned,
+            PROMPTS[state.round_idx],
+        )
+        await update.message.reply_text(f"AI: #{ai_obj.output_text}")
         # write to CSV with participant_id only (no Telegram identifiers)
         save_row(state.participant_id, state.round_idx, cleaned)
 
@@ -314,7 +316,15 @@ def main():
     if not token:
         raise ValueError("TELEGRAM_BOT_TOKEN not found in .env")
 
-    app = Application.builder().token(token).build()
+    app = (
+        Application.builder()
+        .token(token)
+        .read_timeout(60)
+        .write_timeout(60)
+        .connect_timeout(60)
+        .pool_timeout(60)
+        .build()
+    )
 
     app.add_handler(CommandHandler("start", start_cmd))
     app.add_handler(CommandHandler("restart", restart_cmd))

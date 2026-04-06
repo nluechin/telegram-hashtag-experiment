@@ -1,30 +1,50 @@
 from transformers import pipeline
-
-''' This is the AI interface logic:
-
-- how to call the model
-
-- how to format the prompt
-
-- how to clean the output
-
-This file creates a small wrapper around a Hugging Face language model.
-'''
+import re
 
 class HFPipeline:
-    def __init__(self, model_name: str = "distilgpt2"):
+    def __init__(self, model_name: str = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
         self.model_name = model_name
-        self.generator = pipeline("text-generation", model=model_name)
+        self.generator = pipeline(
+            "text-generation",
+            model=model_name,
+            device=-1
+        )
 
     def build_prompt(self, prompt_text: str, human_text: str) -> str:
-        return f"{prompt_text}\nHuman: {human_text}\nAI:"
+        return (
+            "Give one related word.\n"
+            "Rules: one word only, letters or numbers only, no punctuation, no explanation.\n"
+            "Input: yoga\n"
+            "Output: balance\n"
+            "Input: election\n"
+            "Output: politics\n"
+            f"Input: {human_text}\n"
+            "Output:"
+        )
 
-    def generate(self, prompt: str, max_new_tokens: int = 25) -> str:
+    def generate(self, prompt: str, max_new_tokens: int = 6) -> str:
         result = self.generator(
             prompt,
             max_new_tokens=max_new_tokens,
             do_sample=True,
+            temperature=0.7,
+            top_p=0.9,
             num_return_sequences=1,
+            return_full_text=False,
         )[0]["generated_text"]
 
-        return result.split("AI:", 1)[-1].strip()
+        text = result.strip()
+
+        # keep only first line
+        text = text.split("\n", 1)[0].strip()
+
+        # remove common prompt-echo fragments if they appear
+        text = text.replace("Output:", "").strip()
+        text = text.replace("Input:", "").strip()
+
+        # keep only first word-like chunk
+        match = re.search(r"[A-Za-z0-9]+", text)
+        if match:
+            return match.group(0)
+
+        return "response"
