@@ -52,12 +52,12 @@ Telegram is used solely as the interaction interface. All research data are stor
 ## Setup
 
 ### 1. Install dependencies (hugging face)
-python-telegram-bot==21.6
-python-dotenv
-transformers
-torch
-sentence-transformers
-pandas
+python-telegram-bot==21.6,
+python-dotenv,
+transformers,
+torch,
+sentence-transformers,
+pandas,
 numpy
 
 ### 2. Create `.env` file (for telegram bot token)
