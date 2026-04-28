@@ -1,338 +1,179 @@
-import os
 import csv
-import time
+import os
 import re
-from dataclasses import dataclass
-from typing import Dict, Optional
-from hf_pipeline_llm_baseline import HFPipeline
-from pipeline import run_step
-import asyncio
+from datetime import datetime
 
 from dotenv import load_dotenv
-from telegram import Update     #telegram library objects: Update is object representing an incoming event (message, command, etc.)
-# telegram.ext provides the bot "framework" (app + handlers + filters)
+from telegram import Update
 from telegram.ext import (
-    Application,                # the main bot application (dispatcher + HTTP client)
-    CommandHandler,             # routes /start, /restart, /withdraw
-    MessageHandler,             # routes non-command text messages
-    ContextTypes,               # type hints for callback context
-    filters,                    # prebuilt filters for matching messages
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
 )
 
-#This file handles all interaction with Telegram users.
-#
-# Responsibilities:
-# - receives incoming messages from participants
-# - manages per-user state (participant_id, round, etc.)
-# - sends prompts and instructions to users
-# - routes user responses into the experiment pipeline
-#
-# This file DOES NOT contain:
-# - model logic (handled in hf_layer.py)
-# - experiment step logic (handled in pipeline.py)
-# - data schemas (handled in schemas.py)
-#
-# Role in the system:
-# This is the user interface layer that connects human
-# participants to the backend experiment system.
-#
+from pipeline import run_step
 
 
+load_dotenv()
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
+DATA_FILE = "hashtag_responses.csv"
+MAX_ROUNDS = 10
 
 
-
-hf = HFPipeline(model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0")
-ENV_PATH = ".env"
-CSV_PATH = "Hashtag_telegram_study.csv"
-
-INTRO_TEXT = "Starting the game now."
-DONE_TEXT = "All done. Thank you!"
-INVALID_HASHTAG_TEXT = (
-    "Please reply with a single hashtag-style word using only letters and numbers.\n"
-    "No spaces. Example: #breakingnews"
-)
-
-# Customize rounds here
-PROMPTS = [
-    "Please submit a short hashtag response.",
-    "Please submit another short hashtag response.",
-    "Please submit another short hashtag response.",
-]
-
-# Participant code format
-# Examples accepted: P014, p014, 014 
-# - accepts "P014", "p014", or "014"
-# - 2 to 4 digits (so 01..9999), optional leading P
-PID_PATTERN = re.compile(r"^P?\d{2,4}$", re.IGNORECASE)
-
-# Hashtag content pattern:
-# - after stripping leading '#', must be letters/numbers only
-# - no underscores, hyphens, emojis, punctuation, etc.
-HASHTAG_PATTERN = re.compile(r"^[A-Za-z0-9]+$")
+user_state = {}
 
 
-# State (in-memory)
+def is_valid_hashtag(text: str) -> bool:
+    text = text.strip()
 
-@dataclass
-class UserState:
-    """
-    Tracks where one Telegram chat is in the flow.
+    if text.startswith("#"):
+        text = text[1:]
 
-    participant_id:
-      - stored after user enters a valid code (P014)
-      - written to CSV (NOT their Telegram info)
-
-    round_idx:
-      - which PROMPT index the user is currently on
-
-    awaiting_hashtag:
-      - True when we expect a hashtag response
-      - False when we expect a participant ID or are transitioning
-
-    withdrawn:
-      - user opted out; we stop recording and stop flow
-    """
-    participant_id: Optional[str] = None
-    round_idx: int = 0
-    awaiting_hashtag: bool = False
-    withdrawn: bool = False
-
-# keyed by telegram chat_id for routing only (NOT written to CSV)
-# chat_id is stable within a chat and is how you know "this message belongs to that user session".
-user_state: Dict[int, UserState] = {}
+    return bool(re.fullmatch(r"[A-Za-z0-9_]+", text))
 
 
-# Helpers
+def clean_display_hashtag(text: str) -> str:
+    text = text.strip().lower()
 
-def ensure_csv_header(path):
-    """
-    Creates the CSV file with a header row if it doesn't exist yet.
-    This is called right before writing the first row to guarantee structure.
-    """
-    if os.path.exists(path):
-        return
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["unix_time", "participant_id", "round_index", "hashtag", "prompt"])
+    if text.startswith("#"):
+        text = text[1:]
 
-def normalize_participant_id(text):
-    t = (text or "").strip()
-    if not t:
-        return None
-    if not PID_PATTERN.fullmatch(t):
-        return None
-    t = t.upper()
-    if not t.startswith("P"):       #add participant ID to start with "P" 
-        t = "P" + t
-    return t
+    return text
 
-def parse_hashtag(text):
-    if not text:
-        return None
-    t = text.strip()
-    if not t:
-        return None
-    # remove leading #
-    if t.startswith("#"):
-        t = t[1:]
-    # no spaces
-    if " " in t:
-        return None
-    # Enforce letters/numbers only
-    if not HASHTAG_PATTERN.fullmatch(t):
-        return None
-    return t
 
-def save_row(participant_id, round_idx, hashtag):
-    '''appends one response to the CSV. This writes NO Telegram identifiers.'''
-    ensure_csv_header(CSV_PATH)
-    prompt_text = PROMPTS[round_idx]        # the prompt shown for this round
-    with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
-        csv.writer(f).writerow([time.time(), participant_id, round_idx, hashtag, prompt_text])
+def initialize_csv():
+    if not os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "w", newline="", encoding="utf-8") as file:
+            writer = csv.writer(file)
+            writer.writerow(
+                [
+                    "timestamp",
+                    "participant_id",
+                    "round_idx",
+                    "human_raw_text",
+                    "human_cleaned_text",
+                    "ai_response",
+                    "predicted_label",
+                    "score_table",
+                ]
+            )
 
-def get_state(chat_id):
-    # If this user does not have a state yet
+
+def log_response(human_response, ai_response):
+    with open(DATA_FILE, "a", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+
+        writer.writerow(
+            [
+                datetime.now().isoformat(),
+                human_response.participant_id,
+                human_response.round_idx,
+                human_response.raw_text,
+                human_response.cleaned_text,
+                ai_response.output_text,
+                ai_response.meta.get("predicted_label", ""),
+                ai_response.meta.get("score_table", ""),
+            ]
+        )
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+
+    user_state[chat_id] = {
+        "stage": "awaiting_participant_code",
+        "participant_id": None,
+        "round_idx": 0,
+    }
+
+    await update.message.reply_text(
+        "Welcome. Please enter your participant code to begin."
+    )
+
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    message_text = update.message.text.strip()
+
     if chat_id not in user_state:
-        # create a blank state for them
-        user_state[chat_id] = UserState()
-    return user_state[chat_id]
-
-# Sends the next prompt for the current round OR ends the study if finished
-async def send_round_prompt(update, state):
-    # If we've already completed all rounds, send the final message and stop expecting input
-    if state.round_idx >= len(PROMPTS):
-        state.awaiting_hashtag = False
-        await update.message.reply_text(DONE_TEXT)
+        await update.message.reply_text(
+            "Please type /start to begin."
+        )
         return
 
-    # select the correct prompt for this round
-    prompt = PROMPTS[state.round_idx]
-    state.awaiting_hashtag = True       # Mark that the next message we receive should be a hashtag response
-    
-    # send the prompt message to the user via Telegram
-    await update.message.reply_text(f"{prompt}\nReply with a hashtag (example: #breakingnews).")
+    state = user_state[chat_id]
 
+    if state["stage"] == "awaiting_participant_code":
+        participant_id = message_text.strip()
 
-# Handlers
+        state["participant_id"] = participant_id
+        state["stage"] = "in_game"
+        state["round_idx"] = 1
 
-# /start command: begins the study flow or re-enters the flow without resetting participant_id
-async def start_cmd(update, context):
-    chat_id = update.effective_chat.id
-    state = get_state(chat_id)
-
-    # if they already started and have a PID, prevent re-entry into the study flow
-    if state.withdrawn:
-        await update.message.reply_text("You previously withdrew. If this is a mistake, contact the research team.")
+        await update.message.reply_text(
+            "Thank you. The game will now begin.\n\n"
+            "Round 1: Please send one hashtag-style response."
+        )
         return
 
-    # reset progression through rounds while preserving participant_id
-    state.round_idx = 0
-    state.awaiting_hashtag = False
-
-    # prompt for participant ID (first step of the interaction flow)
-    await update.message.reply_text(
-        "Welcome. Please enter your participant code to begin (example: P014).\n"
-        "Do not enter your name or any personal info."
-    )
-
-# /restart command: fully resets participant state and returns to participant ID entry step
-async def restart_cmd(update, context):
-    chat_id = update.effective_chat.id
-    state = get_state(chat_id)
-
-    # If the user has withdrawn, prevent re-entry into the study flow
-    if state.withdrawn:
-        await update.message.reply_text("You previously withdrew. If this is a mistake, contact the research team.")
-        return
-
-    # clear participant identity and reset all progression through rounds
-    state.participant_id = None
-    state.round_idx = 0
-    state.awaiting_hashtag = False
-
-    # prompt for participant ID to begin the study from the start
-    await update.message.reply_text(
-        "Restarted. Please enter your participant code to begin (example: P014)."
-    )
-
-#(COMMENTED OUT FOR PILOT VERSION)
-#  /withdraw command: records participant withdrawal and stops all further data collection
-# async def withdraw_cmd(update, context):
-#    chat_id = update.effective_chat.id
-#    state = get_state(chat_id)
-
-#    state.withdrawn = True
-#    state.awaiting_hashtag = False
-
-    #clear PID so  stop linking any future inputs
-#    state.participant_id = None
-#    state.round_idx = 0
-
-#    await update.message.reply_text(
-#        "You have withdrawn. No further responses will be recorded. Thank you."
-#    )
-
-
-# Handles all non-command text messages and routes them based on user state
-async def message_handler(update, context):
-    # ignore updates that are not standard text messages
-    if not update.message or not update.message.text:
-        return
-
-    # identify chat session and load current participant state
-    chat_id = update.effective_chat.id
-    text = update.message.text.strip()
-    state = get_state(chat_id)
-
-    #(COMMENTED OUT FOR PILOT VERSION)
-    #if state.withdrawn:
-    #    await update.message.reply_text("You previously withdrew. No responses are being recorded.")
-    #    return
-
-    # STEP 1: Collect participant code first
-    if state.participant_id is None:
-        pid = normalize_participant_id(text)
-        # reject invalid participant ID formats
-        if pid is None:
+    if state["stage"] == "in_game":
+        if not is_valid_hashtag(message_text):
             await update.message.reply_text(
-                "That does not look like a valid participant code.\n"
-                "Please enter something like P014 (letters + numbers only)."
+                "Please send one hashtag-style response using only letters, numbers, or underscores. Example: #grief"
             )
             return
 
-        # store normalized participant ID and begin study flow
-        state.participant_id = pid
-        await update.message.reply_text(INTRO_TEXT)
+        participant_id = state["participant_id"]
+        round_idx = state["round_idx"]
 
-        # Send first round prompt and set awaiting_hashtag = True
-        await send_round_prompt(update, state)
-        return
-
-    # Step 2: Collect hashtag responses
-    if state.awaiting_hashtag:
-        cleaned = parse_hashtag(text)
-
-        # reject invalid hashtag format first
-        if cleaned is None:
-            await update.message.reply_text(INVALID_HASHTAG_TEXT)
-            return
-
-        # only run pipeline after valid input
-        human_obj, ai_obj = await asyncio.to_thread(
-            run_step,
-            hf,
-            state.participant_id,
-            state.round_idx,
-            text,
-            cleaned,
-            PROMPTS[state.round_idx],
+        human_response, ai_response = run_step(
+            participant_id=participant_id,
+            round_idx=round_idx,
+            raw_text=message_text,
         )
-        await update.message.reply_text(f"AI: #{ai_obj.output_text}")
-        # write to CSV with participant_id only (no Telegram identifiers)
-        save_row(state.participant_id, state.round_idx, cleaned)
 
-        state.round_idx += 1
-        state.awaiting_hashtag = False
+        log_response(human_response, ai_response)
 
-        # If all rounds are completed, send final message and stop
-        if state.round_idx >= len(PROMPTS):
-            await update.message.reply_text(DONE_TEXT)
+        await update.message.reply_text(
+            f"AI: #{ai_response.output_text}"
+        )
+
+        if round_idx >= MAX_ROUNDS:
+            state["stage"] = "complete"
+
+            await update.message.reply_text(
+                "Thank you. The activity is now complete."
+            )
             return
 
-        # Otherwise send next round prompt and continue
-        await send_round_prompt(update, state)
+        state["round_idx"] += 1
+
+        await update.message.reply_text(
+            f"Round {state['round_idx']}: Please send your next hashtag-style response."
+        )
         return
 
-    # fallback: if they type randomly, just re-prompt the current round
-    await send_round_prompt(update, state)
-
-
-
+    if state["stage"] == "complete":
+        await update.message.reply_text(
+            "You have already completed the activity. Thank you."
+        )
 
 
 def main():
-    load_dotenv(ENV_PATH)
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    if not token:
-        raise ValueError("TELEGRAM_BOT_TOKEN not found in .env")
+    initialize_csv()
 
-    app = (
-        Application.builder()
-        .token(token)
-        .read_timeout(60)
-        .write_timeout(60)
-        .connect_timeout(60)
-        .pool_timeout(60)
-        .build()
-    )
+    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start_cmd))
-    app.add_handler(CommandHandler("restart", restart_cmd))
-    #app.add_handler(CommandHandler("withdraw", withdraw_cmd))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("Telegram Hashtag Bot running...")
-    app.run_polling(close_loop=False)
+    print("Bot is running...")
+    app.run_polling()
+
 
 if __name__ == "__main__":
     main()
