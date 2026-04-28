@@ -1,15 +1,7 @@
-# virtual environment
-.venv/
-
-# environment variables
 .env
-
-# data files
-*.csv
-
-# python cache
+.venv/
+venv/
 __pycache__/
-*.pyc
-
-# mac
+*.csv
+.ipynb_checkpoints/
 .DS_Store
