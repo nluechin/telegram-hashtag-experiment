@@ -1,25 +1,35 @@
-import time
-from schemas import HumanResponse, AIResponse
+from datetime import datetime
 
-def run_step(hf, participant_id, round_idx, raw_text, cleaned_text, prompt_text):
-    human = HumanResponse(
+from schemas import HumanResponse, AIResponse
+from ml_response_pipeline import clean_hashtag, choose_bot_response
+
+
+MODEL_NAME = "embedding_theme_response_selector"
+
+
+def run_step(participant_id: str, round_idx: int, raw_text: str):
+    cleaned_text = clean_hashtag(raw_text)
+
+    human_response = HumanResponse(
         participant_id=participant_id,
         round_idx=round_idx,
         raw_text=raw_text,
         cleaned_text=cleaned_text,
-        timestamp=time.time(),
-        meta={"source": "telegram"},
+        timestamp=datetime.now(),
+        meta={},
     )
 
-    model_prompt = hf.build_prompt(prompt_text, cleaned_text)
-    ai_text = hf.generate(model_prompt, max_new_tokens=6)
+    result = choose_bot_response(cleaned_text)
 
-    ai = AIResponse(
-        model_name=hf.model_name,
-        prompt=model_prompt,
-        output_text=ai_text,
-        timestamp=time.time(),
-        meta={"max_new_tokens": 25},
+    ai_response = AIResponse(
+        model_name=MODEL_NAME,
+        prompt=cleaned_text,
+        output_text=result["response"],
+        timestamp=datetime.now(),
+        meta={
+            "predicted_label": result["predicted_label"],
+            "score_table": result["score_table"],
+        },
     )
 
-    return human, ai
+    return human_response, ai_response
