@@ -1,100 +1,104 @@
-Telegram Hashtag Experiment Bot
+# Telegram Hashtag Experiment Bot
 
 This repository contains a Telegram-based chatbot used to run a multi-round experiment on how people generate and align meaning through interaction with a machine learning system.
 
-The chatbot itself and its interaction flow are mostly set, but the exact research focus is still evolving and may shift over time. In general, the project is centered on understanding human–AI interaction, especially how meaning develops across multiple rounds of exchange.
+The chatbot itself and its interaction flow are mostly set, but the exact research focus is still evolving and may shift over time. In general, the project is centered on understanding human-AI interaction, especially how meaning develops across multiple rounds of exchange.
 
-Overview
+## Overview
 
 The system enables a structured interaction between participants and an automated agent.
 
 Each participant:
 
-interacts with the bot via direct message
-enters a unique participant code
-submits one hashtag per round
-receives a generated response from the system
+- interacts with the bot via direct message
+- enters a unique participant code
+- submits one hashtag per round
+- receives a generated response from the system
 
 This creates a feedback loop where both human and system responses influence subsequent behavior.
 
-Features
+## Features
 
-Telegram bot interface (DM-based interaction)
-Participant code entry (no personal identifiers required)
-Multi-round interactive flow (human ↔ system)
-Hashtag validation and formatting
-Structured CSV logging
-Integration with semantic analysis pipeline
-Embedding-based semantic classification
-Theme prediction through cosine similarity + structured machine learning logic
-Controlled system response generation for improved consistency and interpretability
+- Telegram bot interface, DM-based interaction
+- Participant code entry, no personal identifiers required
+- Multi-round interactive flow, human to system
+- Hashtag validation and formatting
+- Structured CSV logging
+- Integration with semantic analysis pipeline
+- Embedding-based semantic classification
+- Theme prediction through cosine similarity and structured machine learning logic
+- Controlled system response generation for improved consistency and interpretability
 
-Data Privacy
+## Data Privacy
 
 The bot stores only:
 
-participant_id
-round_index
-hashtag response
-system outputs
-timestamp
-prompt text
+- participant_id
+- round_index
+- hashtag response
+- system outputs
+- timestamp
+- prompt text
 
 The system does not store:
 
-Telegram usernames
-phone numbers
-chat IDs in analysis data
+- Telegram usernames
+- phone numbers
+- chat IDs in analysis data
 
 Telegram is used solely as the interaction interface. All research data are stored locally in CSV format.
 
-Setup
+## Setup
 
-1. Install dependencies
+### 1. Install dependencies
 
-python-telegram-bot==21.6
-python-dotenv
-sentence-transformers
-scikit-learn
-pandas
-numpy
+python-telegram-bot==21.6  
+python-dotenv  
+sentence-transformers  
+scikit-learn  
+pandas  
+numpy  
 
-2. Create .env file (for Telegram bot token)
+### 2. Create `.env` file for Telegram bot token
 
-3. Run the bot locally
+### 3. Run the bot locally
 
-Usage
+## Usage
 
 Participants open the bot by clicking a link and:
 
-Enter participant code
-Submit hashtag responses for each round
-Receive structured machine learning system responses
-Data is logged to CSV file
+- enter participant code
+- submit hashtag responses for each round
+- receive structured machine learning system responses
+- data is logged to CSV file
 
-Project Evolution
+## Project Evolution
 
 In the early stages of this project we tried building a chatbot using Slack as the software platform but it posed IRB concerns such as 2FA and other privacy concerns. After realizing these issues we proceeded by switching software platforms to Telegram, another messaging app.
 
-Upon switching to Telegram I reprogrammed and setup a chatbot using the Telegram API. This project originally used a lightweight LLM-based response generator (TinyLlama) to produce one related word in response to participant hashtags. That version served as an early prototype for testing interactive human–AI flow inside Telegram.
+Upon switching to Telegram I reprogrammed and setup a chatbot using the Telegram API. This project originally used a lightweight LLM-based response generator, TinyLlama, to produce one related word in response to participant hashtags. That version served as an early prototype for testing interactive human-AI flow inside Telegram.
 
 As the project evolved, the response-generation approach shifted toward a more controlled semantic pipeline based on embeddings, cosine similarity, theme classification, and structured machine learning logic. This change was made to improve:
 
-consistency of responses
-interpretability of outputs
-reproducibility of experimental behavior
-alignment with downstream analysis methods
+- consistency of responses
+- interpretability of outputs
+- reproducibility of experimental behavior
+- alignment with downstream analysis methods
 
 The earlier LLM-based implementation may remain in earlier commits or as reference material, but the current primary experimental direction is the semantic ML pipeline.
 
-The semantic pipeline in this repo, titled semantic_pipeline_v1.ipynb, reflects exploratory work used to improve chatbot response architecture, though it may still contain mistakes and has not yet been fully reviewed by my mentor Dr. Hunter P.
+The semantic pipeline in this repo, titled `semantic_pipeline_v1.ipynb`, reflects exploratory work used to improve chatbot response architecture, though it may still contain mistakes and has not yet been fully reviewed by my mentor Dr. Hunter P.
 
-Research Use
+## Research Use
 
-This tool is built off of Hunter Priniski's Otree Network experiments (link: https://github.com/jpriniski/NetCom/tree/main/Experiment%20Software) and designed for research studies of human–AI interaction, language, and meaning formation.
+This tool is built off of Hunter Priniski's Otree Network experiments.
 
-Version 20+ of python-telegram-bot is built on asyncio, which is Python’s system for:
+Link: https://github.com/jpriniski/NetCom/tree/main/Experiment%20Software
 
-handling many tasks at once
-without using threads
-efficient for network-heavy apps (like bots)
+It is designed for research studies of human-AI interaction, language, and meaning formation.
+
+Version 20+ of `python-telegram-bot` is built on asyncio, which is Python's system for:
+
+- handling many tasks at once
+- operating without threads
+- efficiently supporting network-heavy applications like bots
