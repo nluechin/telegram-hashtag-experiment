@@ -89,6 +89,17 @@ The earlier LLM-based implementation may remain in earlier commits or as referen
 
 The semantic pipeline in this repo, titled `semantic_pipeline_v1.ipynb`, reflects exploratory work used to improve chatbot response architecture, though it may still contain mistakes and has not yet been fully reviewed by my mentor Dr. Hunter P.
 
+## File Map
+
+```text
+telegram_hashtag_bot.py       Main Telegram interface and participant flow
+pipeline.py                   Connects bot input to the response logic
+ml_response_pipeline.py       Semantic/theme-based response selector
+schemas.py                    Data structures for human and system responses
+requirements.txt              Python dependencies
+semantic_pipeline_v1.ipynb    Exploratory notebook for semantic response development
+SETUP_GUIDE.md                Instructions for configuring and running the Telegram bot
+
 ## Research Use
 
 This tool is built off of Hunter Priniski's Otree Network experiments.
