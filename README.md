@@ -99,6 +99,39 @@ schemas.py                    Data structures for human and system responses
 requirements.txt              Python dependencies
 semantic_pipeline_v1.ipynb    Exploratory notebook for semantic response development
 SETUP_GUIDE.md                Instructions for configuring and running the Telegram bot
+NOTES_FOR_HANDOFF.md          Project status, transfer notes, and future recommendations
+```
+
+## Current Limitations
+
+The current response system is still a prototype and should be reviewed before being used in a live research study.
+
+The semantic response pipeline is intended to improve consistency, interpretability, and reproducibility, but it may still need additional testing, review, and adjustment.
+
+The current system uses structured response logic instead of freeform LLM generation. This means the bot responses are more controlled, but also less flexible than a fully generative chatbot.
+
+## IRB and Research Use Note
+
+This repository is a technical prototype. Any live participant use should follow the approved IRB protocol, consent language, and data handling requirements.
+
+Telegram is used only as the participant-facing interaction interface. Research data should be reviewed and stored according to the study protocol.
+
+## Example Interaction
+
+```text
+Bot: Welcome. Please enter your participant code to begin.
+
+User: P001
+
+Bot: Thank you. The game will now begin.
+Round 1: Please send one hashtag-style response.
+
+User: #grief
+
+Bot: AI: #pain
+
+Bot: Round 2: Please send your next hashtag-style response.
+```
 
 ## Research Use
 
